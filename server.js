@@ -6,7 +6,6 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ▼ 見えない空白や改行を自動で削除する安全装置(.trim)を追加 ▼
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ? process.env.DISCORD_BOT_TOKEN.trim() : null;
 const GUILD_ID = process.env.GUILD_ID ? process.env.GUILD_ID.trim() : null;
 const ROLE_ID = process.env.ROLE_ID ? process.env.ROLE_ID.trim() : null;
@@ -24,10 +23,9 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
-// ▼▼▼ 究極の探偵コード：Botの脳内の声をすべて出力 ▼▼▼
+// デバッグ用ログ（本番でも動作確認として役立つので残しておきます）
 client.on('debug', info => console.log(`[🤖 Botの脳内]: ${info}`));
 client.on('error', error => console.error(`[🚨 致命的エラー]:`, error));
-// ▲▲▲ これでどこでフリーズしているか100%分かります ▲▲▲
 
 client.once('ready', () => {
     console.log(`🤖 Discord Bot is ready! Logged in as ${client.user.tag}`);
@@ -37,7 +35,9 @@ client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.commandName === 'link') {
-        const orderId = interaction.options.getString('order_id').trim();
+        // ▼ 変更点：入力された文字から「半角#」や「全角＃」を消し去り、前後の空白も消す ▼
+        let rawInput = interaction.options.getString('order_id');
+        const orderId = rawInput.replace(/[#＃]/g, '').trim();
         const discordId = interaction.user.id;
 
         try {
@@ -50,7 +50,7 @@ client.on(Events.InteractionCreate, async interaction => {
             const member = await interaction.guild.members.fetch(discordId);
             await member.roles.add(ROLE_ID);
             
-            console.log(`✅ [コマンド受付]: 注文番号[${orderId}] -> ユーザー[${interaction.user.tag}] に紐づけ＆ロール付与完了`);
+            console.log(`✅ [コマンド受付]: 入力[${rawInput}] -> 変換後[${orderId}] -> ユーザー[${interaction.user.tag}] に紐づけ＆ロール付与完了`);
             await interaction.reply({ content: `✅ 注文番号 **${orderId}** を照合し、「サブスク」ロールを付与しました！`, ephemeral: true });
         } catch (error) {
             console.error('❌ エラー:', error.message);
@@ -64,12 +64,16 @@ app.use(express.json());
 app.post('/webhook/appstle', async (req, res) => {
     res.status(200).send('Webhook Received');
     console.log('\n======= [Webhook Request: Cancel] =======');
-    const orderId = req.body.order_id; 
+    
+    // ▼ 変更点：Shopifyから万が一 # 付きで送られてきても大丈夫なようにクリーニング ▼
+    const rawOrderId = req.body.order_id; 
 
-    if (!orderId) {
+    if (!rawOrderId) {
         console.log('⚠️ エラー: JSON内に `order_id` が見つかりませんでした。剥奪処理をスキップします。\n');
         return;
     }
+
+    const orderId = String(rawOrderId).replace(/[#＃]/g, '').trim();
 
     try {
         const { data, error: fetchError } = await supabase
@@ -113,7 +117,6 @@ app.post('/webhook/appstle', async (req, res) => {
 // 起動
 app.listen(PORT, () => {
     console.log(`🚀 Web Server is running on http://localhost:${PORT}`);
-    
     console.log(`🔍 【最終探偵報告】`);
     console.log(`1. Discordトークン: ${DISCORD_BOT_TOKEN ? '👀文字列あり(空白除去済)' : '🙈空っぽ'}`);
     
