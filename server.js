@@ -6,24 +6,28 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const GUILD_ID = process.env.GUILD_ID;
-const ROLE_ID = process.env.ROLE_ID;
-
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
+// ▼ 見えない空白や改行を自動で削除する安全装置(.trim)を追加 ▼
+const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN ? process.env.DISCORD_BOT_TOKEN.trim() : null;
+const GUILD_ID = process.env.GUILD_ID ? process.env.GUILD_ID.trim() : null;
+const ROLE_ID = process.env.ROLE_ID ? process.env.ROLE_ID.trim() : null;
+const SUPABASE_URL = process.env.SUPABASE_URL ? process.env.SUPABASE_URL.trim() : null;
+const SUPABASE_KEY = process.env.SUPABASE_KEY ? process.env.SUPABASE_KEY.trim() : null;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
     console.error('❌ エラー: .env に SUPABASE_URL または SUPABASE_KEY がありません。');
     process.exit(1);
 }
 
-// Supabase初期化
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
+
+// ▼▼▼ 究極の探偵コード：Botの脳内の声をすべて出力 ▼▼▼
+client.on('debug', info => console.log(`[🤖 Botの脳内]: ${info}`));
+client.on('error', error => console.error(`[🚨 致命的エラー]:`, error));
+// ▲▲▲ これでどこでフリーズしているか100%分かります ▲▲▲
 
 client.once('ready', () => {
     console.log(`🤖 Discord Bot is ready! Logged in as ${client.user.tag}`);
@@ -37,7 +41,6 @@ client.on(Events.InteractionCreate, async interaction => {
         const discordId = interaction.user.id;
 
         try {
-            // Supabaseに保存（UPSERT: 既にあれば上書き）
             const { error: dbError } = await supabase
                 .from('links')
                 .upsert({ order_id: orderId, discord_id: discordId }, { onConflict: 'order_id' });
@@ -60,9 +63,7 @@ app.use(express.json());
 
 app.post('/webhook/appstle', async (req, res) => {
     res.status(200).send('Webhook Received');
-
     console.log('\n======= [Webhook Request: Cancel] =======');
-
     const orderId = req.body.order_id; 
 
     if (!orderId) {
@@ -71,7 +72,6 @@ app.post('/webhook/appstle', async (req, res) => {
     }
 
     try {
-        // Supabaseからデータ取得
         const { data, error: fetchError } = await supabase
             .from('links')
             .select('discord_id')
@@ -92,7 +92,6 @@ app.post('/webhook/appstle', async (req, res) => {
                 await member.roles.remove(ROLE_ID);
                 console.log(`🗑️ [剥奪成功]: 注文番号[${orderId}] のキャンセル通知により、ユーザー[${member.user.tag}] からロールを外しました。\n`);
                 
-                // Supabaseから削除
                 const { error: deleteError } = await supabase
                     .from('links')
                     .delete()
@@ -115,17 +114,13 @@ app.post('/webhook/appstle', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`🚀 Web Server is running on http://localhost:${PORT}`);
     
-    // ▼ここから探偵コード▼
-    console.log(`🔍 【探偵報告】`);
-    console.log(`1. Discordトークン: ${DISCORD_BOT_TOKEN ? '👀見えています！' : '🙈空っぽです（見えません）'}`);
-    console.log(`2. Supabase URL: ${SUPABASE_URL ? '👀見えています！' : '🙈空っぽです（見えません）'}`);
+    console.log(`🔍 【最終探偵報告】`);
+    console.log(`1. Discordトークン: ${DISCORD_BOT_TOKEN ? '👀文字列あり(空白除去済)' : '🙈空っぽ'}`);
     
     if (DISCORD_BOT_TOKEN) {
         console.log('⏳ Discordへ接続のドアを叩きます...');
         client.login(DISCORD_BOT_TOKEN)
             .then(() => console.log('✅ ドアが開きました（ログイン処理通過）'))
             .catch(err => console.error('❌ ドアが開きません（Login Error）:', err.message));
-    } else {
-        console.log('⚠️ トークンが見えないので、Discordへの接続を諦めました。');
     }
 });
