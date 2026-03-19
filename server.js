@@ -114,7 +114,18 @@ app.post('/webhook/appstle', async (req, res) => {
 // 起動
 app.listen(PORT, () => {
     console.log(`🚀 Web Server is running on http://localhost:${PORT}`);
+    
+    // ▼ここから探偵コード▼
+    console.log(`🔍 【探偵報告】`);
+    console.log(`1. Discordトークン: ${DISCORD_BOT_TOKEN ? '👀見えています！' : '🙈空っぽです（見えません）'}`);
+    console.log(`2. Supabase URL: ${SUPABASE_URL ? '👀見えています！' : '🙈空っぽです（見えません）'}`);
+    
     if (DISCORD_BOT_TOKEN) {
-        client.login(DISCORD_BOT_TOKEN).catch(err => console.error('❌ Login Error:', err.message));
+        console.log('⏳ Discordへ接続のドアを叩きます...');
+        client.login(DISCORD_BOT_TOKEN)
+            .then(() => console.log('✅ ドアが開きました（ログイン処理通過）'))
+            .catch(err => console.error('❌ ドアが開きません（Login Error）:', err.message));
+    } else {
+        console.log('⚠️ トークンが見えないので、Discordへの接続を諦めました。');
     }
 });
