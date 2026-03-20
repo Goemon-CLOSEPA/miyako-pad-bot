@@ -16,7 +16,7 @@ const commands = [
         .setDescription('Shopifyの注文番号とDiscordアカウントを連携し、サブスクロールを付与します。')
         .addStringOption(option =>
             option.setName('order_id')
-                .setDescription('購入時の注文番号またはサブスクID（例: #1001）')
+                .setDescription('購入時の注文番号またはサブスクID（例: 1001）')
                 .setRequired(true)
         )
 ].map(command => command.toJSON());
