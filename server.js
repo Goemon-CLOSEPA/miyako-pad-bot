@@ -82,7 +82,12 @@ client.on(Events.InteractionCreate, async interaction => {
 
 app.use(express.json());
 
-// ▼ 新規追加：「購入された時」の通知を受け取る窓口 ▼
+// ▼ 新規追加：UptimeRobotに対する「起きてるよ！」の返事 ▼
+app.get('/', (req, res) => {
+    res.status(200).send('Bot is awake and running!');
+});
+
+// ▼ 既存：「購入された時」の通知を受け取る窓口 ▼
 app.post('/webhook/appstle-create', async (req, res) => {
     res.status(200).send('Webhook Received');
     const rawOrderId = req.body.order_id;
