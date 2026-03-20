@@ -23,7 +23,6 @@ const client = new Client({
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]
 });
 
-// デバッグ用ログ（本番でも動作確認として役立つので残しておきます）
 client.on('debug', info => console.log(`[🤖 Botの脳内]: ${info}`));
 client.on('error', error => console.error(`[🚨 致命的エラー]:`, error));
 
@@ -35,7 +34,6 @@ client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.commandName === 'link') {
-        // ▼ 変更点：入力された文字から「半角#」や「全角＃」を消し去り、前後の空白も消す ▼
         let rawInput = interaction.options.getString('order_id');
         const orderId = rawInput.replace(/[#＃]/g, '').trim();
         const discordId = interaction.user.id;
@@ -51,7 +49,7 @@ client.on(Events.InteractionCreate, async interaction => {
             await member.roles.add(ROLE_ID);
             
             console.log(`✅ [コマンド受付]: 入力[${rawInput}] -> 変換後[${orderId}] -> ユーザー[${interaction.user.tag}] に紐づけ＆ロール付与完了`);
-            await interaction.reply({ content: `✅ 注文番号 **${orderId}** を照合し、「サブスク」ロールを付与しました！`, ephemeral: true });
+            await interaction.reply({ content: `✅ サブスクID **${orderId}** を照合し、「サブスク」ロールを付与しました！`, ephemeral: true });
         } catch (error) {
             console.error('❌ エラー:', error.message);
             await interaction.reply({ content: `❌ 処理に失敗しました。管理者に連絡してください。`, ephemeral: true });
@@ -65,7 +63,6 @@ app.post('/webhook/appstle', async (req, res) => {
     res.status(200).send('Webhook Received');
     console.log('\n======= [Webhook Request: Cancel] =======');
     
-    // ▼ 変更点：Shopifyから万が一 # 付きで送られてきても大丈夫なようにクリーニング ▼
     const rawOrderId = req.body.order_id; 
 
     if (!rawOrderId) {
@@ -73,7 +70,8 @@ app.post('/webhook/appstle', async (req, res) => {
         return;
     }
 
-    const orderId = String(rawOrderId).replace(/[#＃]/g, '').trim();
+    // ▼ 最終進化：gid://shopify/... 形式で来ても、一番最後の数字だけを抜き取る ▼
+    const orderId = String(rawOrderId).split('/').pop().replace(/[#＃]/g, '').trim();
 
     try {
         const { data, error: fetchError } = await supabase
@@ -83,7 +81,7 @@ app.post('/webhook/appstle', async (req, res) => {
             .single();
 
         if (fetchError || !data) {
-            console.log(`⚠️ エラー: 注文番号[${orderId}] のデータが見つかりません。\n`);
+            console.log(`⚠️ エラー: サブスクID[${orderId}] のデータが見つかりません。\n`);
             return;
         }
 
@@ -94,7 +92,7 @@ app.post('/webhook/appstle', async (req, res) => {
             const member = await guild.members.fetch(discordId).catch(() => null);
             if (member) {
                 await member.roles.remove(ROLE_ID);
-                console.log(`🗑️ [剥奪成功]: 注文番号[${orderId}] のキャンセル通知により、ユーザー[${member.user.tag}] からロールを外しました。\n`);
+                console.log(`🗑️ [剥奪成功]: サブスクID[${orderId}] のキャンセル通知により、ユーザー[${member.user.tag}] からロールを外しました。\n`);
                 
                 const { error: deleteError } = await supabase
                     .from('links')
@@ -102,7 +100,7 @@ app.post('/webhook/appstle', async (req, res) => {
                     .eq('order_id', orderId);
                     
                 if (!deleteError) {
-                    console.log(`🗑️ データベースから注文番号[${orderId}]の記録を削除しました。`);
+                    console.log(`🗑️ データベースからサブスクID[${orderId}]の記録を削除しました。`);
                 }
             } else {
                 console.log(`⚠️ ユーザーがサーバーから退出している可能性があります。(ID: ${discordId})\n`);
@@ -117,13 +115,7 @@ app.post('/webhook/appstle', async (req, res) => {
 // 起動
 app.listen(PORT, () => {
     console.log(`🚀 Web Server is running on http://localhost:${PORT}`);
-    console.log(`🔍 【最終探偵報告】`);
-    console.log(`1. Discordトークン: ${DISCORD_BOT_TOKEN ? '👀文字列あり(空白除去済)' : '🙈空っぽ'}`);
-    
     if (DISCORD_BOT_TOKEN) {
-        console.log('⏳ Discordへ接続のドアを叩きます...');
-        client.login(DISCORD_BOT_TOKEN)
-            .then(() => console.log('✅ ドアが開きました（ログイン処理通過）'))
-            .catch(err => console.error('❌ ドアが開きません（Login Error）:', err.message));
+        client.login(DISCORD_BOT_TOKEN).catch(err => console.error('❌ Login Error:', err.message));
     }
 });
